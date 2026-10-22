@@ -1,0 +1,31 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+venv/
+env/
+
+# Editors and OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Local data, model artifacts, history, and logs
+# Keep data in your local working copy; obtain the original CSV as described in README.
+data/*.csv
+data/*.sqlite3
+data/*.sqlite3-*
+data/settings.json
+models/*.joblib
+models/model_metadata.json
+logs/*.log
+
+# Test / build output
+.pytest_cache/
+.coverage
+htmlcov/
+build/
+dist/
+*.spec
