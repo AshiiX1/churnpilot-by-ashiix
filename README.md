@@ -21,11 +21,15 @@ The interface uses Tkinter/ttk (no CustomTkinter dependency) so it stays lightwe
 ## Project structure
 
 ```text
-customer-churn-predictor-pro/
+ChurnPilot-by-ashiix/
 ├── main.py                    # Start the GUI; --train trains/evaluates the model
 ├── requirements.txt           # Runtime dependencies
 ├── README.md
 ├── .gitignore
+├── build_exe.bat              # Build Windows onedir executable with data and icon
+├── run_app.bat                # Launch from source
+├── train_model.bat            # Train from source
+├── run_tests.bat              # Run automated tests
 ├── app/
 │   ├── paths.py               # Central path configuration
 │   ├── core/
@@ -38,6 +42,9 @@ customer-churn-predictor-pro/
 │       └── widgets.py         # Reusable metric cards and tooltips
 ├── data/
 │   └── README.txt             # Instructions for the original CSV
+├── assets/
+│   ├── churnpilot.ico         # App/EXE icon
+│   └── churnpilot-icon.png    # Icon preview
 ├── models/
 │   └── README.txt             # Generated model files go here
 ├── logs/                      # Created automatically
@@ -45,8 +52,19 @@ customer-churn-predictor-pro/
     ├── helpers.py
     ├── test_model_service.py
     ├── test_history_store.py
+    ├── test_paths.py
     └── test_settings.py
 ```
+
+## Quick start for the current fixed package
+
+1. Extract the ZIP, then use VS Code **File → Open Folder** to open the extracted `ChurnPilot-by-ashiix` folder (the folder that contains `main.py` and `requirements.txt`). Do not copy `*_fixed.py` files into `app/ui`.
+2. Put the real CSV you already downloaded at `data\Telco-Customer-Churn.csv`. The data file is intentionally not included in this ZIP.
+3. Run `py -m venv .venv`, then `.\.venv\Scripts\python.exe -m pip install -r requirements.txt` in PowerShell.
+4. Run `.\.venv\Scripts\python.exe main.py` to launch the app, or run `.\.venv\Scripts\python.exe -m unittest discover -v` to run tests.
+5. To create a Windows EXE, make sure the CSV and icon are present and run `build_exe.bat`.
+
+The Pylance import `app.paths` resolves when the project root is opened as the VS Code workspace. The correct module path for the model service is `app/core/model_service.py`.
 
 ## 1. Requirements
 
@@ -142,19 +160,33 @@ Tests cover customer input validation, dataset conversion, training/saving/loadi
 
 Delete history from the History page when no longer needed. Exported CSVs are user-created files and are not removed automatically.
 
-## 7. Optional Windows executable (PyInstaller)
+## 7. Windows executable (PyInstaller)
 
-First install PyInstaller in the same environment:
+The supported build path is the included `build_exe.bat`. Before running it, place the original IBM Telco CSV at:
 
-```powershell
-.\.venv\Scripts\python.exe -m pip install pyinstaller
-.\.venv\Scripts\python.exe -m PyInstaller --noconfirm --clean --onedir --windowed --name ChurnPilot-by-ashiix main.py
+```text
+data\Telco-Customer-Churn.csv
 ```
 
-Then copy your original dataset into `dist\ChurnPilot-by-ashiix\data\Telco-Customer-Churn.csv`. Run `dist\ChurnPilot-by-ashiix\ChurnPilot-by-ashiix.exe` and train the model from Model & Settings, or train it with the source environment before copying the resulting `models` folder beside the executable. The app stores generated model/history/log files beside the executable in an onedir build, so use a folder where your Windows account has write permissions.
+The CSV is intentionally excluded from Git by `.gitignore`, so copy it from your existing local project. Do not replace it with synthetic data.
 
-## Known limitations / sensible next steps
+Then, on Windows:
 
-- The baseline remains Logistic Regression; there has not yet been hyperparameter tuning or threshold optimization.
-- Reported metrics depend on the source dataset and train/test split. The model page shows metrics produced when the local model was trained.
-- This is a local desktop prototype, not a hosted or production customer-management system. It has no remote telemetry, login, or network API.
+1. Open this project folder in VS Code.
+2. Open Terminal → New Terminal.
+3. Run `build_exe.bat` (or double-click it in File Explorer).
+4. Wait for `[SUCCESS] App built at ...`.
+
+The script bundles both `data` and `assets` into the PyInstaller onedir build. The app's path resolver checks the `data` folder beside the EXE first, then PyInstaller's bundled resource directory (including `_internal\data` used by recent PyInstaller versions), then the current working directory. Therefore the training action can find the CSV even when launched from a shortcut with a different working directory.
+
+The resulting executable is:
+
+```text
+dist\ChurnPilot-by-ashiix\ChurnPilot-by-ashiix.exe
+```
+
+Keep the entire `dist\ChurnPilot-by-ashiix` folder together; do not distribute the EXE alone. To share it, zip that entire inner folder. Generated models, metadata, settings, history and logs are stored in writable folders beside the EXE, while bundled read-only assets are resolved separately.
+
+If training reports that the dataset is missing, the dialog and log now list the exact paths that were checked. Confirm that `data\Telco-Customer-Churn.csv` existed in the project before running the build script, and rebuild after changing the path code.
+
+

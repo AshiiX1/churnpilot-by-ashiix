@@ -9,6 +9,8 @@ from datetime import datetime
 from tkinter import filedialog, messagebox, ttk
 from typing import Any
 
+from PIL import Image, ImageTk
+
 from app.core.history_store import HistoryStore
 from app.core.model_service import (
     FIELD_OPTIONS,
@@ -18,7 +20,16 @@ from app.core.model_service import (
     PredictionResult,
 )
 from app.core.settings import SettingsStore
-from app.paths import DATASET_PATH, HISTORY_DB_PATH, MODEL_METADATA_PATH, MODEL_PATH, SETTINGS_PATH
+from app.paths import (
+    DATASET_CANDIDATES,
+    DATASET_PATH,
+    HISTORY_DB_PATH,
+    MODEL_METADATA_PATH,
+    MODEL_PATH,
+    SETTINGS_PATH,
+    resolve_dataset_path,
+    resource_path,
+)
 from app.ui.theme import apply_theme
 from app.ui.widgets import MetricCard, ToolTip
 
@@ -67,6 +78,29 @@ class CustomerChurnApp:
     def __init__(self, root: tk.Tk | None = None) -> None:
         self.root = root or tk.Tk()
         self.root.title("ChurnPilot by ashiix | Customer Analytics")
+
+        # Set the custom window/taskbar icon from the packaged or source assets.
+        icon_path = resource_path("assets/churnpilot.ico")
+        self._window_icons: list[ImageTk.PhotoImage] = []
+        try:
+            if icon_path.is_file():
+                with Image.open(icon_path) as source_icon:
+                    icon_rgba = source_icon.convert("RGBA")
+                self._window_icons = [
+                    ImageTk.PhotoImage(
+                        icon_rgba.resize((size, size), Image.Resampling.LANCZOS),
+                        master=self.root,
+                    )
+                    for size in (16, 24, 32, 48, 64)
+                ]
+                self.root.iconphoto(True, *self._window_icons)
+                logger.info("Application icon loaded from %s", icon_path)
+            else:
+                logger.warning("Application icon file not found: %s", icon_path)
+        except Exception:
+            # A bad/missing icon must never prevent the app from opening.
+            logger.exception("Could not load application icon from %s", icon_path)
+
         self.root.geometry("1320x860")
         self.root.minsize(1080, 700)
         self.root.protocol("WM_DELETE_WINDOW", self.close)
@@ -747,7 +781,7 @@ class CustomerChurnApp:
         for name, path in [
             ("Model file", MODEL_PATH),
             ("Model metadata", MODEL_METADATA_PATH),
-            ("Training data", DATASET_PATH),
+            ("Training data", resolve_dataset_path()),
             ("Prediction history", HISTORY_DB_PATH),
         ]:
             ttk.Label(paths_panel, text=name, style="CardTitle.TLabel").pack(anchor="w", pady=(8, 2))
@@ -763,12 +797,26 @@ class CustomerChurnApp:
     def start_training(self) -> None:
         if self.training_busy:
             return
-        if not DATASET_PATH.exists():
+        # Re-check candidate locations at click time. This avoids relying on
+        # the import-time DATASET_PATH if the CSV was copied after app startup.
+        dataset_candidates = list(dict.fromkeys([
+            *DATASET_CANDIDATES,
+            DATASET_PATH,
+            resolve_dataset_path(),
+        ]))
+        existing_dataset = next(
+            (candidate for candidate in dataset_candidates if candidate.is_file()),
+            None,
+        )
+        if existing_dataset is None:
+            checked_paths = "\n".join(f"  - {candidate}" for candidate in dataset_candidates)
             messagebox.showerror(
                 "Training dataset not found",
-                "The real Telco churn CSV was not found. Copy your existing file to:\n\n"
-                f"{DATASET_PATH}\n\n"
-                "The app deliberately does not substitute synthetic training data.",
+                "The real Telco churn CSV was not found. The app checked these locations:\n\n"
+                f"{checked_paths}\n\n"
+                "Copy your original Telco-Customer-Churn.csv into a 'data' folder beside the EXE, "
+                "or rebuild while the CSV is present in the project's data folder.\n\n"
+                "Synthetic training data will not be used.",
                 parent=self.root,
             )
             self.footer_var.set("Training blocked · dataset missing")

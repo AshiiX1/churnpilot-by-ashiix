@@ -23,7 +23,12 @@ from sklearn.model_selection import train_test_split
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import OneHotEncoder, StandardScaler
 
-from app.paths import DATASET_PATH, MODEL_METADATA_PATH, MODEL_PATH
+from app.paths import (
+    DATASET_CANDIDATES,
+    DATASET_PATH,
+    MODEL_METADATA_PATH,
+    MODEL_PATH,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -108,11 +113,15 @@ class PredictionResult:
 class ModelService:
     def __init__(
         self,
-        dataset_path: Path = DATASET_PATH,
+        dataset_path: Path | None = None,
         model_path: Path = MODEL_PATH,
         metadata_path: Path = MODEL_METADATA_PATH,
     ) -> None:
-        self.dataset_path = Path(dataset_path)
+        # When no path is supplied, use the packaged/runtime-aware resolver.
+        # Explicit paths stay explicit, which keeps tests and embedding callers
+        # deterministic and avoids accidentally training on another dataset.
+        self._use_default_dataset_lookup = dataset_path is None
+        self.dataset_path = Path(dataset_path) if dataset_path is not None else Path(DATASET_PATH)
         self.model_path = Path(model_path)
         self.metadata_path = Path(metadata_path)
         self.model: Pipeline | None = None
@@ -173,15 +182,47 @@ class ModelService:
         return features, target
 
     def train(self) -> dict[str, Any]:
-        if not self.dataset_path.exists():
+        # Resolve immediately before training. The default service may find the
+        # CSV beside the EXE, bundled under PyInstaller's _internal directory,
+        # or under the current working directory. Explicit test/caller paths
+        # are intentionally not replaced with another file.
+        if self._use_default_dataset_lookup:
+            candidate_paths = [*DATASET_CANDIDATES, self.dataset_path]
+        else:
+            candidate_paths = [self.dataset_path]
+
+        unique_candidates: list[Path] = []
+        seen: set[str] = set()
+        for candidate in candidate_paths:
+            candidate = Path(candidate)
+            key = str(candidate.resolve()).casefold()
+            if key not in seen:
+                seen.add(key)
+                unique_candidates.append(candidate)
+
+        selected_path = next(
+            (candidate for candidate in unique_candidates if candidate.is_file()),
+            None,
+        )
+        if selected_path is None:
+            checked = "\n".join(f"  - {path}" for path in unique_candidates)
             raise ModelServiceError(
-                "Training data was not found. Place Telco-Customer-Churn.csv inside the project's data folder, then try again."
+                "Training dataset was not found.\n\n"
+                f"Expected file name: {self.dataset_path.name}\n\n"
+                "Locations checked:\n"
+                f"{checked}\n\n"
+                "For a packaged app, place the CSV in a 'data' folder beside "
+                "the EXE, or rebuild with the CSV present in the project's data folder."
             )
+
         try:
-            frame = pd.read_csv(self.dataset_path)
-        except (OSError, pd.errors.ParserError, UnicodeDecodeError) as exc:
-            raise ModelServiceError(f"Could not read the training dataset: {exc}") from exc
-        return self.train_from_frame(frame, source_path=self.dataset_path)
+            frame = pd.read_csv(selected_path)
+        except (OSError, pd.errors.ParserError, pd.errors.EmptyDataError, UnicodeDecodeError) as exc:
+            raise ModelServiceError(
+                f"Could not read the training dataset at:\n{selected_path}\n\n{exc}"
+            ) from exc
+        self.dataset_path = selected_path
+        return self.train_from_frame(frame, source_path=selected_path)
 
     def train_from_frame(self, frame: pd.DataFrame, source_path: Path | None = None) -> dict[str, Any]:
         features, target = self.prepare_dataset_frame(frame)

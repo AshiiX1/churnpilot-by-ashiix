@@ -13,6 +13,22 @@ from app.paths import LOG_PATH
 from app.core.model_service import ModelService, ModelServiceError
 
 
+def set_windows_app_user_model_id() -> None:
+    """Give Windows a stable app identity for taskbar grouping/icon behavior."""
+    if sys.platform != "win32":
+        return
+    try:
+        import ctypes
+
+        ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(
+            "AshiiX.ChurnPilot.CustomerChurn"
+        )
+    except (AttributeError, OSError):
+        logging.getLogger(__name__).debug(
+            "Could not set Windows AppUserModelID", exc_info=True
+        )
+
+
 def configure_logging() -> None:
     LOG_PATH.parent.mkdir(parents=True, exist_ok=True)
     logging.basicConfig(
@@ -54,6 +70,9 @@ def main() -> int:
 
     if args.train:
         return train_model()
+
+    # Set this before tkinter creates the root window.
+    set_windows_app_user_model_id()
 
     try:
         from app.ui.app import launch_app

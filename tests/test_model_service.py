@@ -80,6 +80,22 @@ class ModelServiceTests(unittest.TestCase):
             with self.assertRaises(ModelServiceError):
                 service.load()
 
+
+    def test_missing_training_dataset_lists_checked_paths(self):
+        with tempfile.TemporaryDirectory() as directory:
+            base = Path(directory)
+            service = ModelService(
+                dataset_path=base / "data" / "Telco-Customer-Churn.csv",
+                model_path=base / "models" / "model.joblib",
+                metadata_path=base / "models" / "metadata.json",
+            )
+            with self.assertRaises(ModelServiceError) as context:
+                service.train()
+            message = str(context.exception)
+            self.assertIn("Training dataset was not found", message)
+            self.assertIn("Locations checked:", message)
+            self.assertIn("Telco-Customer-Churn.csv", message)
+
     def test_training_requires_both_target_classes(self):
         frame = sample_training_frame(30)
         frame["Churn"] = "No"

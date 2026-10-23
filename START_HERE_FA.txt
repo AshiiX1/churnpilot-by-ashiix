@@ -1,0 +1,32 @@
+ChurnPilot by ashiix — راهنمای شروع سریع
+========================================
+
+مهم: کل پوشه پروژه را در VS Code باز کنید؛ فایل‌های منفرد *_fixed.py را داخل app/ui کپی نکنید.
+ساختار درست ماژول‌ها این است:
+  app/paths.py
+  app/core/model_service.py
+  app/ui/app.py
+
+۱) فایل ZIP را در یک پوشه جدید Extract کنید.
+۲) در VS Code از File > Open Folder، پوشه ChurnPilot-by-ashiix را باز کنید؛ همان پوشه‌ای که main.py و requirements.txt در ریشه دارد.
+۳) دیتاست واقعی پروژه قبلی را به این مسیر کپی کنید:
+   data\Telco-Customer-Churn.csv
+   این CSV به‌عمد داخل ZIP نیست.
+۴) در Terminal > New Terminal دستورات زیر را از ریشه پروژه اجرا کنید:
+   py -m venv .venv
+   .\.venv\Scripts\python.exe -m pip install -r requirements.txt
+۵) تست‌ها:
+   .\.venv\Scripts\python.exe -m unittest discover -v
+۶) اجرای برنامه:
+   .\.venv\Scripts\python.exe main.py
+۷) آموزش مدل از خط فرمان (اختیاری؛ بعد از قرار دادن CSV):
+   .\.venv\Scripts\python.exe main.py --train
+۸) ساخت EXE ویندوز:
+   اجرای build_exe.bat از پوشه اصلی پروژه.
+
+اگر Pylance خطای import app.paths می‌دهد، معمولاً پوشه اشتباهی در VS Code باز شده است.
+باید ریشه پروژه باز باشد، نه app یا app/ui. مسیر model_service.py نیز باید
+app\core\model_service.py باشد، نه app\ui\ChurnPilot_model_service_fixed.py.
+
+فایل دیتاست اصلی باید CSV واقعی IBM Telco Customer Churn باشد و ستون Churn را داشته باشد.
+این برنامه از دیتای مصنوعی به‌جای دیتاست واقعی استفاده نمی‌کند.
